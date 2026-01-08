@@ -1,0 +1,15 @@
+# DuckDB artifacts
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp
+
+# Generated data
+data/raw/
+exports/
+logs/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.env
