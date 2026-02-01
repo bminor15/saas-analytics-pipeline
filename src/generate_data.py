@@ -1,6 +1,7 @@
 # src/generate_data.py
 from __future__ import annotations
 
+import argparse
 import math
 from dataclasses import asdict
 from datetime import datetime, timedelta
@@ -254,8 +255,29 @@ def generate_events_parquet(
         writer.close()
 
 
-def main():
-    cfg = GeneratorConfig(dataset_size="medium", seed=42)
+def _build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Generate deterministic synthetic SaaS data.")
+    parser.add_argument("--size", choices=["small", "medium", "large"], default="medium")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--start-date", default="2024-01-01")
+    parser.add_argument("--end-date", default="2025-12-31")
+    parser.add_argument("--events-chunk-rows", type=int, default=250_000)
+    return parser
+
+
+def _build_config(args: argparse.Namespace) -> GeneratorConfig:
+    return GeneratorConfig(
+        dataset_size=args.size,
+        seed=args.seed,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        events_chunk_rows=args.events_chunk_rows,
+    )
+
+
+def main() -> None:
+    args = _build_arg_parser().parse_args()
+    cfg = _build_config(args)
     paths = cfg.paths()
     _ensure_dir(paths.raw_dir)
 
@@ -263,7 +285,7 @@ def main():
     fake.seed_instance(cfg.seed)
     rng = np.random.default_rng(cfg.seed)
 
-    # Generate and write raw filesuree
+    # Generate and write raw files
     accounts = generate_accounts(cfg, fake, rng)
     accounts_path = paths.raw_dir / "accounts.csv"
     accounts.to_csv(accounts_path, index=False)
@@ -283,7 +305,7 @@ def main():
     events_path = paths.raw_dir / "events.parquet"
     generate_events_parquet(cfg, rng, users, events_path)
 
-    print("✅ Synthetic raw data generated:")
+    print("OK - Synthetic raw data generated:")
     print(f"  - {accounts_path}")
     print(f"  - {users_path}")
     print(f"  - {subs_path}")
