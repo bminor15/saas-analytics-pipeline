@@ -14,6 +14,7 @@ SQL_STEPS = [
     "sql/10_staging.sql",
     "sql/20_warehouse_dims.sql",
     "sql/30_warehouse_facts.sql",
+    "sql/40_marts.sql",
 ]
 
 
