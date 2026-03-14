@@ -1,7 +1,7 @@
 DB=warehouse/dev.duckdb
 
 run:
-	python src/run_pipeline.py
+	python -m src.run_pipeline
 
 gen:
 	python -m src.generate_data --size $(or $(SIZE),medium)
