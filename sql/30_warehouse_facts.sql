@@ -1,11 +1,7 @@
--- sql/30_warehouse_facts.sql
--- Fact tables for the warehouse layer.
+-- fact tables
 
--- ---------------------------------------------------------------------------
--- fact_subscriptions
--- Grain: one row per subscription.
--- Metrics: MRR, subscription duration, churn flag, plan metadata.
--- ---------------------------------------------------------------------------
+-- one row per subscription
+-- mrr_usd is 0 for canceled subs, list_price_usd for active ones
 CREATE OR REPLACE TABLE fact_subscriptions AS
 SELECT
     s.subscription_id,
@@ -17,7 +13,7 @@ SELECT
     p.plan_rank,
     p.list_price_usd,
 
-    -- Date keys for joining to dim_date
+    -- date keys for joining to dim_date
     CAST(strftime(s.start_at::DATE, '%Y%m%d') AS INTEGER)      AS start_date_key,
     CAST(strftime(
         COALESCE(s.end_at, CURRENT_TIMESTAMP)::DATE, '%Y%m%d'
@@ -27,15 +23,13 @@ SELECT
     s.end_at,
     s.status,
 
-    -- Churn flag
     (s.status = 'canceled')                                     AS is_churned,
 
-    -- Subscription duration in days (open subs measured to today)
+    -- open subs measured to today
     DATEDIFF('day', s.start_at, COALESCE(s.end_at, CURRENT_TIMESTAMP))
                                                                 AS duration_days,
 
-    -- Monthly Recurring Revenue proxy: list price / 12 for annual estimate
-    -- Free plan contributes 0 MRR
+    -- free plan contributes 0 MRR
     CASE WHEN s.status = 'active' THEN p.list_price_usd ELSE 0.00 END
                                                                 AS mrr_usd
 
@@ -44,11 +38,8 @@ LEFT JOIN dim_account   a ON s.account_id = a.account_id
 LEFT JOIN dim_plan      p ON s.plan       = p.plan_name;
 
 
--- ---------------------------------------------------------------------------
--- fact_payments
--- Grain: one row per payment.
--- Metrics: amount, payment outcomes, revenue by plan/account/period.
--- ---------------------------------------------------------------------------
+-- one row per payment
+-- revenue_usd is 0 for failed/refunded rows
 CREATE OR REPLACE TABLE fact_payments AS
 SELECT
     py.payment_id,
@@ -66,12 +57,11 @@ SELECT
     py.currency,
     py.status,
 
-    -- Outcome flags for easy aggregation
+    -- outcome flags
     (py.status = 'paid')                                        AS is_paid,
     (py.status = 'failed')                                      AS is_failed,
     (py.status = 'refunded')                                    AS is_refunded,
 
-    -- Revenue only on successful payments
     CASE WHEN py.status = 'paid' THEN py.amount ELSE 0.00 END  AS revenue_usd
 
 FROM stg_payments       py
@@ -80,11 +70,7 @@ LEFT JOIN dim_account       a  ON s.account_id       = a.account_id
 LEFT JOIN dim_plan          p  ON s.plan             = p.plan_name;
 
 
--- ---------------------------------------------------------------------------
--- fact_events
--- Grain: one row per product event.
--- Metrics: DAU, WAU, MAU, feature usage, platform breakdown.
--- ---------------------------------------------------------------------------
+-- one row per product event
 CREATE OR REPLACE TABLE fact_events AS
 SELECT
     e.event_id,
@@ -102,7 +88,7 @@ SELECT
     CAST(strftime(e.occurred_at::DATE, '%Y%m%d') AS INTEGER)   AS occurred_date_key,
     e.occurred_at,
 
-    -- Convenience flags for common event-type filters
+    -- handy flags for common filters
     (e.event_type = 'login')                                    AS is_login,
     (e.event_type = 'error')                                    AS is_error,
     (e.event_type = 'api_call')                                 AS is_api_call

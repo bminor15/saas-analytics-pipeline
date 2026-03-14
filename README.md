@@ -1,6 +1,6 @@
 # SaaS Analytics Pipeline
 
-A local analytics engineering pipeline built with DuckDB, modelled on Snowflake-style layered architecture. Ingests synthetic SaaS data and transforms it through raw → staging → warehouse → marts layers using SQL.
+A local analytics engineering pipeline using DuckDB. Synthetic SaaS data flows through a layered SQL architecture — raw → staging → warehouse → marts — built to mirror how this would work in a real data stack (Snowflake, dbt, etc.).
 
 ---
 
@@ -37,7 +37,7 @@ A local analytics engineering pipeline built with DuckDB, modelled on Snowflake-
 | Layer | Tool |
 |---|---|
 | Warehouse | [DuckDB](https://duckdb.org/) |
-| Transformations | SQL (Snowflake-style layered) |
+| Transformations | SQL |
 | Orchestration | Python 3.11+ |
 | Data generation | Python, NumPy, Faker, PyArrow |
 | Build | GNU Make |
@@ -47,21 +47,27 @@ A local analytics engineering pipeline built with DuckDB, modelled on Snowflake-
 ## Quickstart
 
 ```bash
-# 1. Install dependencies
+# install dependencies
 pip install -r requirements.txt
 
-# 2. Generate synthetic raw data (medium dataset ~4M events)
+# generate synthetic raw data (medium ~4M events)
 make gen
 
-# 3. Run the full pipeline
+# run the full pipeline
 make run
 ```
 
-Optional: generate a different dataset size
+Other dataset sizes:
 
 ```bash
 make gen SIZE=small   # ~300k events
 make gen SIZE=large   # ~20M events
+```
+
+Verify row counts at each layer:
+
+```bash
+make check
 ```
 
 ---
@@ -71,23 +77,25 @@ make gen SIZE=large   # ~20M events
 ```
 saas-analytics-pipeline/
 ├── data/
-│   └── raw/                  # Generated source files (git-ignored)
+│   └── raw/                  # generated source files (git-ignored)
 │       ├── accounts.csv
 │       ├── users.csv
 │       ├── subscriptions.csv
 │       ├── payments.csv
 │       └── events.parquet
 ├── sql/
-│   ├── 00_raw_ddl.sql        # Raw views over source files
-│   ├── 10_staging.sql        # Cleaning and type casting
-│   ├── 20_warehouse_dims.sql # Dimension tables
-│   ├── 30_warehouse_facts.sql# Fact tables
-│   └── 40_marts.sql          # Analytical mart views
+│   ├── 00_raw_ddl.sql        # views over raw files
+│   ├── 10_staging.sql        # type casting + data quality
+│   ├── 20_warehouse_dims.sql # dimension tables
+│   ├── 30_warehouse_facts.sql# fact tables
+│   ├── 40_marts.sql          # analytical views
+│   └── 99_checks.sql         # row count checks
+├── queries/                  # standalone analytical queries
 ├── src/
-│   ├── config.py             # Dataset size config and paths
-│   ├── generate_data.py      # Synthetic data generator
-│   └── run_pipeline.py       # Pipeline orchestrator
-├── warehouse/                # DuckDB database files (git-ignored)
+│   ├── config.py             # dataset sizing + paths
+│   ├── generate_data.py      # synthetic data generator
+│   └── run_pipeline.py       # pipeline runner
+├── warehouse/                # DuckDB files (git-ignored)
 ├── Makefile
 └── requirements.txt
 ```
@@ -96,15 +104,15 @@ saas-analytics-pipeline/
 
 ## Dataset
 
-Synthetic SaaS data generated deterministically (seed = 42) across a 2-year window (2024–2025). Intentional data quality issues are injected at the source to exercise the staging layer.
+Deterministic synthetic data (seed=42) across a 2-year window (2024–2025). Dirty data is intentionally injected at the source to exercise the staging layer.
 
-| Entity | Medium rows | Notes |
+| Entity | Medium rows | Injected issues |
 |---|---|---|
 | accounts | 5,000 | 3% null industry |
 | users | 50,000 | 1% malformed emails |
 | subscriptions | 6,000 | 30% churn rate |
 | payments | 120,000 | 0.3% null amounts |
-| events | 4,000,000 | 0.2% null timestamps, 0.2% unknown types |
+| events | 4,000,000 | 0.2% null timestamps, 0.2% unknown event types |
 
 ---
 
@@ -112,36 +120,36 @@ Synthetic SaaS data generated deterministically (seed = 42) across a 2-year wind
 
 ### Dimensions
 
-| Table | Grain | Key attributes |
-|---|---|---|
-| `dim_date` | One row per calendar day | year, month, quarter, day_of_week, is_weekend |
-| `dim_account` | One row per account | industry, region, tier |
-| `dim_user` | One row per valid user | role, account_id |
-| `dim_plan` | One row per plan | plan_rank, list_price_usd |
+| Table | Key attributes |
+|---|---|
+| `dim_date` | year, month, quarter, day_of_week, is_weekend |
+| `dim_account` | industry, region, tier |
+| `dim_user` | role, account_id (valid emails only) |
+| `dim_plan` | plan_rank, list_price_usd |
 
 ### Facts
 
-| Table | Grain | Key metrics |
-|---|---|---|
-| `fact_subscriptions` | One row per subscription | mrr_usd, duration_days, is_churned |
-| `fact_payments` | One row per payment | revenue_usd, is_paid, is_failed, is_refunded |
-| `fact_events` | One row per product event | is_login, is_error, is_api_call |
+| Table | Key metrics |
+|---|---|
+| `fact_subscriptions` | mrr_usd, duration_days, is_churned |
+| `fact_payments` | revenue_usd, is_paid, is_failed, is_refunded |
+| `fact_events` | is_login, is_error, is_api_call |
 
 ### Marts
 
-| View | Business question |
+| View | What it answers |
 |---|---|
-| `mart_mrr_by_month` | What is MRR by plan, tier, and region over time? |
-| `mart_churn_by_month` | How many subscriptions churned per month? |
-| `mart_revenue_by_month` | What is actual collected revenue and payment health? |
-| `mart_daily_active_users` | What is DAU / active account count per day? |
-| `mart_feature_usage` | Which features are used most, and on which platforms? |
+| `mart_mrr_by_month` | MRR by plan, tier, region over time |
+| `mart_churn_by_month` | Churned subscriptions per month |
+| `mart_revenue_by_month` | Collected revenue + payment health |
+| `mart_daily_active_users` | DAU + active accounts per day |
+| `mart_feature_usage` | Feature usage by platform and tier |
 
 ---
 
 ## Sample Queries
 
-**Total MRR by plan (latest month)**
+**MRR by plan (latest month)**
 ```sql
 SELECT plan, SUM(mrr_usd) AS mrr_usd, SUM(active_subscriptions) AS subs
 FROM mart_mrr_by_month
@@ -176,7 +184,7 @@ GROUP BY account_tier
 ORDER BY revenue_usd DESC;
 ```
 
-**30-day rolling DAU trend**
+**30-day rolling DAU**
 ```sql
 SELECT
     date_day,

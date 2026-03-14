@@ -1,12 +1,7 @@
--- sql/40_marts.sql
--- Analytical mart views built on top of warehouse facts and dims.
--- These answer real SaaS business questions directly.
+-- mart views on top of the warehouse facts + dims
 
--- ---------------------------------------------------------------------------
--- mart_mrr_by_month
--- Monthly Recurring Revenue per plan / tier / region.
--- Spine: every month in dim_date x every active subscription that month.
--- ---------------------------------------------------------------------------
+-- MRR per plan / tier / region by month
+-- uses a month spine so each active sub contributes to every month it covers
 CREATE OR REPLACE VIEW mart_mrr_by_month AS
 WITH month_spine AS (
     SELECT DISTINCT DATE_TRUNC('month', date_day) AS month_start
@@ -41,11 +36,7 @@ GROUP BY 1, 2, 3, 4, 5, 6
 ORDER BY month_start, plan_rank;
 
 
--- ---------------------------------------------------------------------------
--- mart_churn_by_month
--- Churned subscriptions per month, sliced by plan / tier / region.
--- Use alongside mart_mrr_by_month to calculate churn rate.
--- ---------------------------------------------------------------------------
+-- churned subscriptions per month - join to mart_mrr_by_month to get churn rate
 CREATE OR REPLACE VIEW mart_churn_by_month AS
 SELECT
     DATE_TRUNC('month', end_at::DATE)               AS churn_month,
@@ -61,11 +52,8 @@ GROUP BY 1, 2, 3, 4, 5
 ORDER BY churn_month;
 
 
--- ---------------------------------------------------------------------------
--- mart_revenue_by_month
--- Actual collected revenue from payments (not MRR estimates).
--- Includes payment health metrics: failed and refunded counts.
--- ---------------------------------------------------------------------------
+-- actual collected revenue from payments (not MRR estimates)
+-- includes failed/refunded counts for payment health monitoring
 CREATE OR REPLACE VIEW mart_revenue_by_month AS
 SELECT
     d.year_month,
@@ -84,11 +72,8 @@ GROUP BY 1, 2, 3, 4
 ORDER BY d.year_month, fp.plan;
 
 
--- ---------------------------------------------------------------------------
--- mart_daily_active_users
--- DAU and active account counts per day.
--- Foundation for WAU / MAU rollups and engagement trend analysis.
--- ---------------------------------------------------------------------------
+-- DAU + active accounts per day, broken out by tier and region
+-- roll up to WAU/MAU by grouping on year_month
 CREATE OR REPLACE VIEW mart_daily_active_users AS
 SELECT
     d.date_day,
@@ -108,11 +93,7 @@ GROUP BY 1, 2, 3, 4, 5
 ORDER BY d.date_day;
 
 
--- ---------------------------------------------------------------------------
--- mart_feature_usage
--- Event volume by type, device, and OS per month.
--- Answers: what features are used most, on which platforms?
--- ---------------------------------------------------------------------------
+-- event volume by type, device, and OS per month
 CREATE OR REPLACE VIEW mart_feature_usage AS
 SELECT
     d.year_month,

@@ -1,11 +1,7 @@
--- sql/20_warehouse_dims.sql
--- Dimension tables for the warehouse layer.
+-- dimension tables
 
--- ---------------------------------------------------------------------------
--- dim_date
--- One row per calendar date covering the full data window plus buffer.
--- Enables time-series slicing on any fact table via a date key (integer YYYYMMDD).
--- ---------------------------------------------------------------------------
+-- one row per calendar day, 2024-01-01 through 2025-12-31
+-- date_key is YYYYMMDD integer for fast joins to fact tables
 CREATE OR REPLACE TABLE dim_date AS
 WITH dates AS (
     SELECT CAST(UNNEST(range(
@@ -28,10 +24,7 @@ SELECT
     (EXTRACT(dow FROM date_day) IN (0, 6))           AS is_weekend
 FROM dates;
 
--- ---------------------------------------------------------------------------
--- dim_account
--- One row per account. Carries descriptive attributes for slicing facts.
--- ---------------------------------------------------------------------------
+-- one row per account
 CREATE OR REPLACE TABLE dim_account AS
 SELECT
     account_id,
@@ -43,10 +36,7 @@ SELECT
     CAST(strftime(created_at::DATE, '%Y%m%d') AS INTEGER) AS created_date_key
 FROM stg_accounts;
 
--- ---------------------------------------------------------------------------
--- dim_user
--- One row per user. Excludes invalid emails (flagged in staging).
--- ---------------------------------------------------------------------------
+-- valid users only (bad emails filtered in staging)
 CREATE OR REPLACE TABLE dim_user AS
 SELECT
     user_id,
@@ -58,10 +48,7 @@ SELECT
 FROM stg_users
 WHERE is_valid_email;
 
--- ---------------------------------------------------------------------------
--- dim_plan
--- Static lookup for subscription plans and their relative tier ordering.
--- ---------------------------------------------------------------------------
+-- static plan lookup with price and rank order
 CREATE OR REPLACE TABLE dim_plan AS
 SELECT *
 FROM (VALUES

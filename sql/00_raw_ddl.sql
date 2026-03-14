@@ -1,6 +1,5 @@
--- sql/00_raw_ddl.sql
--- Register raw source files as DuckDB views.
--- Paths are relative to the project root (where the pipeline runner is invoked).
+-- views over the raw source files
+-- paths resolve relative to project root
 
 CREATE OR REPLACE VIEW raw_accounts AS
 SELECT * FROM read_csv('data/raw/accounts.csv', header = true, auto_detect = true);
