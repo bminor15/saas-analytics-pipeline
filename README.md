@@ -36,9 +36,9 @@ A local analytics engineering pipeline using DuckDB. Synthetic SaaS data flows t
 
 Built in Power BI on top of the star schema (facts + dims). DAX measures recompute MRR, churn, and engagement directly from raw fact rows.
 
-![Revenue Overview](screenshots/revenue_overview.png)
-![Subscription Health](screenshots/subscription_health.png)
-![Product Engagement](screenshots/product_engagement.png)
+![Revenue Overview](screenshots/revenue_overview.PNG)
+![Subscription Health](screenshots/subscription_health.PNG)
+![Product Engagement](screenshots/product_engagement.PNG)
 
 ---
 
