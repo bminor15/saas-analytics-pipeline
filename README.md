@@ -32,6 +32,16 @@ A local analytics engineering pipeline using DuckDB. Synthetic SaaS data flows t
 
 ---
 
+## Dashboard
+
+Built in Power BI on top of the star schema (facts + dims). DAX measures recompute MRR, churn, and engagement directly from raw fact rows.
+
+![Revenue Overview](screenshots/revenue_overview.png)
+![Subscription Health](screenshots/subscription_health.png)
+![Product Engagement](screenshots/product_engagement.png)
+
+---
+
 ## Tech Stack
 
 | Layer | Tool |
@@ -40,6 +50,7 @@ A local analytics engineering pipeline using DuckDB. Synthetic SaaS data flows t
 | Transformations | SQL |
 | Orchestration | Python 3.11+ |
 | Data generation | Python, NumPy, Faker, PyArrow |
+| Dashboard | Power BI |
 | Build | GNU Make |
 
 ---
@@ -95,7 +106,10 @@ saas-analytics-pipeline/
 │   ├── config.py             # dataset sizing + paths
 │   ├── generate_data.py      # synthetic data generator
 │   └── run_pipeline.py       # pipeline runner
+├── exports/                  # Parquet exports for Power BI (git-ignored)
+├── screenshots/              # Dashboard screenshots
 ├── warehouse/                # DuckDB files (git-ignored)
+├── saas-analytics-dashboard.pbix
 ├── Makefile
 └── requirements.txt
 ```
